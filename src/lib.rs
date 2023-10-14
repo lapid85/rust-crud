@@ -31,7 +31,7 @@ pub fn impl_crud_table(input: proc_macro::TokenStream) -> proc_macro::TokenStrea
             }
 
             /// get_all: 获取全部记录
-            pub async fn get_all(pool: &common::types::pg::Pool) -> Result<Vec<Self>, &'static str> {
+            pub async fn get_all(pool: &common::types::Db) -> Result<Vec<Self>, &'static str> {
                 let sql = format!("SELECT {} FROM {}", Self::get_fields(), Self::get_table_name());
                 sqlx::query_as::<_, Self>(&sql).fetch_all(pool).await.map_err(|e| {
                         println!("get_all error: {:?}", e);
@@ -40,7 +40,7 @@ pub fn impl_crud_table(input: proc_macro::TokenStream) -> proc_macro::TokenStrea
             }
 
             /// get_all_by_cond: 获取带分页的全部记录
-            pub async fn get_all_by_cond(pool: &common::types::pg::Pool, cond: &common::types::Cond) -> Result<(Vec<Self>, i64), &'static str> {
+            pub async fn get_all_by_cond(pool: &common::types::Db, cond: &common::types::Cond) -> Result<(Vec<Self>, i64), &'static str> {
                 let sql_cond = cond.build();
                 let sql = format!("SELECT {} FROM {} {}", Self::get_fields(), Self::get_table_name(), sql_cond);
                 let rows = match sqlx::query_as::<_, Self>(&sql).fetch_all(pool).await {
@@ -62,7 +62,7 @@ pub fn impl_crud_table(input: proc_macro::TokenStream) -> proc_macro::TokenStrea
             }
 
             /// get_all_by_query: 获取按查询条件/分页的全部记录 - 可以把 Order by 写到 query 查询条件里面
-            pub async fn get_all_by_query(pool: &common::types::pg::Pool, query: &str, values: &[common::types::Val]) -> Result<Vec<Self>, &'static str> {
+            pub async fn get_all_by_query(pool: &common::types::Db, query: &str, values: &[common::types::Val]) -> Result<Vec<Self>, &'static str> {
                 let query_cond = if query.is_empty() { String::from("") } else { format!("WHERE {}", query) };
                 let sql = format!("SELECT {} FROM {} {}", Self::get_fields(), Self::get_table_name(), &query_cond);
                 let mut builder = sqlx::query_as::<_, Self>(&sql);
@@ -95,7 +95,7 @@ pub fn impl_crud_table(input: proc_macro::TokenStream) -> proc_macro::TokenStrea
             }
 
             /// get_all_by_query_raw: 获取全部记录
-            pub async fn get_all_by_query_raw(pool: &common::types::pg::Pool, sql: &str) -> Result<Vec<Self>, &'static str> {
+            pub async fn get_all_by_query_raw(pool: &common::types::Db, sql: &str) -> Result<Vec<Self>, &'static str> {
                 sqlx::query_as::<_, Self>(sql).fetch_all(pool).await.map_err(|e| {
                         println!("get_all error: {:?}", e);
                         "获取数据失败"
@@ -103,7 +103,7 @@ pub fn impl_crud_table(input: proc_macro::TokenStream) -> proc_macro::TokenStrea
             }
 
             /// get_by_cond: 查询单条记录 - 依据条件
-            pub async fn get_by_cond(pool: &common::types::pg::Pool, cond: &common::types::Cond) -> Option<Self> {
+            pub async fn get_by_cond(pool: &common::types::Db, cond: &common::types::Cond) -> Option<Self> {
                 let sql_cond = cond.build();
                 let sql = format!("SELECT {} FROM {} {}", Self::get_fields(), Self::get_table_name(), sql_cond);
                 if let Ok(v) = sqlx::query_as::<_, Self>(&sql).fetch_one(pool).await {
@@ -113,7 +113,7 @@ pub fn impl_crud_table(input: proc_macro::TokenStream) -> proc_macro::TokenStrea
             }
 
             /// get_by_query: 获取按查询条件/分页的单条记录 - 可以把 Order by 写到 query 查询条件里面
-            pub async fn get_by_query(pool: &common::types::pg::Pool, query: &str, values: &[common::types::Val]) -> Option<Self> {
+            pub async fn get_by_query(pool: &common::types::Db, query: &str, values: &[common::types::Val]) -> Option<Self> {
                 if let Ok(mut rows) = Self::get_all_by_query(pool, query, values).await {
                     return rows.pop();
                 }
@@ -121,7 +121,7 @@ pub fn impl_crud_table(input: proc_macro::TokenStream) -> proc_macro::TokenStrea
             }
 
             /// get_by_query_raw: 查询单条记录 - 原始sql
-            pub async fn get_by_query_raw(pool: &common::types::pg::Pool, sql: &str) -> Option<Self> {
+            pub async fn get_by_query_raw(pool: &common::types::Db, sql: &str) -> Option<Self> {
                 if let Ok(v) = sqlx::query_as::<_, Self>(sql).fetch_one(pool).await {
                     return Some(v);
                 }
@@ -143,7 +143,7 @@ pub fn impl_crud_table(input: proc_macro::TokenStream) -> proc_macro::TokenStrea
                         );
                         tokens.push(quote!{
                             /// 依据字段 #current_field 得到单条记录
-                            pub async fn #get_by_method(pool: &common::types::pg::Pool, field_value: &#field_type) -> Result<Self, &'static str> {
+                            pub async fn #get_by_method(pool: &common::types::Db, field_value: &#field_type) -> Result<Self, &'static str> {
                                 let sql = format!("SELECT {} FROM {} WHERE {} = $1 LIMIT 1", Self::get_fields(), Self::get_table_name(), #current_field);
                                 sqlx::query_as::<_, Self>(&sql).bind(field_value).fetch_one(pool).await.map_err(|e| {
                                         println!("{}", e);
@@ -160,7 +160,7 @@ pub fn impl_crud_table(input: proc_macro::TokenStream) -> proc_macro::TokenStrea
                         let sql_where = format!("WHERE {} = $1", field_name.to_owned());
                         tokens.push(quote!{
                             /// 依据字段 #current_field 得到所有记录
-                            pub async fn #get_all_by_method(pool: &common::types::pg::Pool, field_value: &#field_type) -> Result<Vec<Self>, &'static str> {
+                            pub async fn #get_all_by_method(pool: &common::types::Db, field_value: &#field_type) -> Result<Vec<Self>, &'static str> {
                                 let sql = format!("SELECT {} FROM {} {}", Self::get_fields(), Self::get_table_name(), #sql_where);
                                 sqlx::query_as::<_, Self>(&sql).bind(field_value).fetch_all(pool).await.map_err(|e| {
                                         println!("{}", e);
@@ -180,7 +180,7 @@ pub fn impl_crud_table(input: proc_macro::TokenStream) -> proc_macro::TokenStrea
                         );
                         tokens.push(quote!{
                             /// 依据字段 #current_field 更新单条记录
-                            pub async fn #update_by_method(pool: &common::types::pg::Pool, value_old: &#field_type, value_new: &#field_type) ->Result<(), &'static str> {
+                            pub async fn #update_by_method(pool: &common::types::Db, value_old: &#field_type, value_new: &#field_type) ->Result<(), &'static str> {
                                 let sql = format!("UPDATE {} {} LIMIT 1", Self::get_table_name(), #update_where_sql);
                                 match sqlx::query(&sql).bind(value_old).bind(value_new).execute(pool).await {
                                         Ok(_) => Ok(()),
@@ -201,7 +201,7 @@ pub fn impl_crud_table(input: proc_macro::TokenStream) -> proc_macro::TokenStrea
                             format!("SET {} = $1 WHERE {} = $2", &field_name, &field_name);
                         tokens.push(quote!{
                             /// 依据字段 #current_field 更新单条记录
-                            pub async fn #update_all_by_method(pool: &common::types::pg::Pool, value_old: &#field_type, value_new: &#field_type) -> Result<(), &'static str> {
+                            pub async fn #update_all_by_method(pool: &common::types::Db, value_old: &#field_type, value_new: &#field_type) -> Result<(), &'static str> {
                                 let sql = format!("UPDATE {} {} LIMIT 1", Self::get_table_name(), #update_all_where_sql);
                                 match sqlx::query(&sql).bind(value_old).bind(value_new).execute(pool).await {
                                         Ok(_) => Ok(()),
@@ -221,7 +221,7 @@ pub fn impl_crud_table(input: proc_macro::TokenStream) -> proc_macro::TokenStrea
                         let delete_where_sql = format!("WHERE {} = $1 LIMIT 1", &field_name);
                         tokens.push(quote!{
                             /// 依据字段 #current_field 删除单条记录
-                            pub async fn #delete_by_method(pool: &common::types::pg::Pool, field_value: &#field_type) -> Result<(), &'static str> {
+                            pub async fn #delete_by_method(pool: &common::types::Db, field_value: &#field_type) -> Result<(), &'static str> {
                                 let sql = format!("DELETE FROM {} {}", Self::get_table_name(), #delete_where_sql);
                                 match sqlx::query(&sql).bind(field_value).execute(pool).await {
                                         Ok(_) => Ok(()),
@@ -241,7 +241,7 @@ pub fn impl_crud_table(input: proc_macro::TokenStream) -> proc_macro::TokenStrea
                         let delete_all_where_sql = format!("WHERE {} = $1", &field_name);
                         tokens.push(quote!{
                             /// 依据字段 #current_field 删除全部记录
-                            pub async fn #delete_all_by_method(pool: &common::types::pg::Pool, field_value: &#field_type) -> Result<(), &'static str> {
+                            pub async fn #delete_all_by_method(pool: &common::types::Db, field_value: &#field_type) -> Result<(), &'static str> {
                                 let sql = format!("DELETE FROM {} {}", Self::get_table_name(), #delete_all_where_sql);
                                 match sqlx::query(&sql).bind(field_value).execute(pool).await {
                                         Ok(_) => Ok(()),
@@ -261,7 +261,7 @@ pub fn impl_crud_table(input: proc_macro::TokenStream) -> proc_macro::TokenStrea
                         let modify_where_sql = format!("SET {} = $1", &field_name);
                         tokens.push(quote!{
                             /// 依据字段 #current_field 更新单条记录
-                            pub async fn #modify_by_method(&self, pool: &common::types::pg::Pool, field_value: &#field_type) -> Result<(), &'static str> {
+                            pub async fn #modify_by_method(&self, pool: &common::types::Db, field_value: &#field_type) -> Result<(), &'static str> {
                                 let change_sql = format!("UPDATE {} {} WHERE id = {}", Self::get_table_name(), #modify_where_sql, &self.id);
                                 println!("CHANGE SQL: {}", change_sql);
                                 match sqlx::query(&change_sql).bind(field_value).execute(pool).await {
@@ -467,7 +467,7 @@ pub fn impl_crud_table(input: proc_macro::TokenStream) -> proc_macro::TokenStrea
             }
         });
         tokens.push(quote! {
-            pub async fn create(&self, pool: &common::types::pg::Pool) -> Result<(), &'static str> {
+            pub async fn create(&self, pool: &common::types::Db) -> Result<(), &'static str> {
                 let mut insert_sql = String::from("INSERT INTO ");
                 insert_sql.push_str(Self::get_table_name());
                 insert_sql.push_str(" (");
@@ -492,7 +492,7 @@ pub fn impl_crud_table(input: proc_macro::TokenStream) -> proc_macro::TokenStrea
             }
         });
         tokens.push(quote!{
-            pub async fn create_or_skip_by(&self, pool: &common::types::pg::Pool, skip_field: &'static str) -> Result<(), &'static str> {
+            pub async fn create_or_skip_by(&self, pool: &common::types::Db, skip_field: &'static str) -> Result<(), &'static str> {
                 let mut insert_sql = String::from("INSERT INTO ");
                 insert_sql.push_str(Self::get_table_name());
                 insert_sql.push_str(" (");
@@ -520,7 +520,7 @@ pub fn impl_crud_table(input: proc_macro::TokenStream) -> proc_macro::TokenStrea
         });
         tokens.push(quote!{
             /// 更新记录 - 修改指定字段
-            pub async fn update(&self, pool: &common::types::pg::Pool, cond_fields: &[(&'static str, common::types::Val)]) -> Result<(), &'static str> {
+            pub async fn update(&self, pool: &common::types::Db, cond_fields: &[(&'static str, common::types::Val)]) -> Result<(), &'static str> {
                 let mut update_sql = String::from("UPDATE ");
                 update_sql.push_str(Self::get_table_name());
                 update_sql.push_str(" SET ");
@@ -537,19 +537,19 @@ pub fn impl_crud_table(input: proc_macro::TokenStream) -> proc_macro::TokenStrea
                 let mut builder = sqlx::query(&update_sql);
                 for (_, val) in cond_fields {
                     match val {
-                        common::types::pg::Val::I8(rv)  => { builder = builder.bind::<i8>(*rv); },
-                        common::types::pg::Val::U8(rv)  => { builder = builder.bind::<i8>(*rv as i8); },
-                        common::types::pg::Val::I16(rv) => { builder = builder.bind::<i16>(*rv); },
-                        common::types::pg::Val::U16(rv) => { builder = builder.bind::<i16>(*rv as i16); },
-                        common::types::pg::Val::I32(rv) => { builder = builder.bind::<i32>(*rv); },
-                        common::types::pg::Val::U32(rv) => { builder = builder.bind::<i32>(*rv as i32); },
-                        common::types::pg::Val::I64(rv) => { builder = builder.bind::<i64>(*rv); },
-                        common::types::pg::Val::U64(rv) => { builder = builder.bind::<i64>(*rv as i64); },
-                        common::types::pg::Val::F32(rv) => { builder = builder.bind::<f32>(*rv); },
-                        common::types::pg::Val::F64(rv) => { builder = builder.bind::<f64>(*rv); },
-                        common::types::pg::Val::Str(rv) => { builder = builder.bind(rv); },
-                        common::types::pg::Val::S(rv)   => { builder = builder.bind(rv); },
-                        common::types::pg::Val::Bool(rv) => { builder = builder.bind(rv); },
+                        common::types::Val::I8(rv)  => { builder = builder.bind::<i8>(*rv); },
+                        common::types::Val::U8(rv)  => { builder = builder.bind::<i8>(*rv as i8); },
+                        common::types::Val::I16(rv) => { builder = builder.bind::<i16>(*rv); },
+                        common::types::Val::U16(rv) => { builder = builder.bind::<i16>(*rv as i16); },
+                        common::types::Val::I32(rv) => { builder = builder.bind::<i32>(*rv); },
+                        common::types::Val::U32(rv) => { builder = builder.bind::<i32>(*rv as i32); },
+                        common::types::Val::I64(rv) => { builder = builder.bind::<i64>(*rv); },
+                        common::types::Val::U64(rv) => { builder = builder.bind::<i64>(*rv as i64); },
+                        common::types::Val::F32(rv) => { builder = builder.bind::<f32>(*rv); },
+                        common::types::Val::F64(rv) => { builder = builder.bind::<f64>(*rv); },
+                        common::types::Val::Str(rv) => { builder = builder.bind(rv); },
+                        common::types::Val::S(rv)   => { builder = builder.bind(rv); },
+                        common::types::Val::Bool(rv) => { builder = builder.bind(rv); },
                         _ => { continue; }
                     }
                 }
@@ -565,7 +565,7 @@ pub fn impl_crud_table(input: proc_macro::TokenStream) -> proc_macro::TokenStrea
         });
         tokens.push(quote! {
             /// 更新记录 - 修改所有字段
-            pub async fn save(&self, pool: &common::types::pg::Pool) -> Result<(), &'static str> {
+            pub async fn save(&self, pool: &common::types::Db) -> Result<(), &'static str> {
                 let mut save_sql = String::from("UPDATE ");
                 save_sql.push_str(Self::get_table_name());
                 save_sql.push_str(" SET ");
@@ -590,7 +590,7 @@ pub fn impl_crud_table(input: proc_macro::TokenStream) -> proc_macro::TokenStrea
         });
         tokens.push(quote! {
             /// 删除记录
-            pub async fn delete(&self, pool: &common::types::pg::Pool) -> Result<(), &'static str> {
+            pub async fn delete(&self, pool: &common::types::Db) -> Result<(), &'static str> {
                 let mut delete_sql = String::from("DELETE FROM ");
                 delete_sql.push_str(Self::get_table_name());
                 delete_sql.push_str(&format!(" WHERE id = {}", self.id));
