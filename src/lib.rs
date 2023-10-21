@@ -42,23 +42,65 @@ pub fn impl_crud_table(input: proc_macro::TokenStream) -> proc_macro::TokenStrea
             /// get_all_by_cond: 获取带分页的全部记录
             pub async fn get_all_by_cond(pool: &common::types::Db, cond: &common::types::Cond) -> Result<(Vec<Self>, i64), &'static str> {
                 let sql_cond = cond.build();
-                let sql = format!("SELECT {} FROM {} {}", Self::get_fields(), Self::get_table_name(), sql_cond);
+                let sql = format!("SELECT {} FROM {} WHERE {}", Self::get_fields(), Self::get_table_name(), sql_cond);
+                println!("SQL: {}", sql);
+                let sql_total = format!("SELECT COUNT(*) AS total FROM {} WHERE {}", Self::get_table_name(), sql_cond);
+                println!("SQL_TOTAL: {}", sql_total);
                 let mut builder = sqlx::query_as::<_, Self>(&sql);
+                let mut builder_total = sqlx::query_as::<_, common::types::pg::Total>(&sql_total);
                 for v in &cond.args {
                     match v {
-                        common::types::Val::I8(rv)      => { builder = builder.bind::<i8>(*rv); },
-                        common::types::Val::U8(rv)      => { builder = builder.bind::<i8>(*rv as i8); },
-                        common::types::Val::I16(rv)     => { builder = builder.bind::<i16>(*rv); },
-                        common::types::Val::U16(rv)     => { builder = builder.bind::<i16>(*rv as i16); },
-                        common::types::Val::I32(rv)     => { builder = builder.bind::<i32>(*rv); },
-                        common::types::Val::U32(rv)     => { builder = builder.bind::<i32>(*rv as i32); },
-                        common::types::Val::I64(rv)     => { builder = builder.bind::<i64>(*rv); },
-                        common::types::Val::U64(rv)     => { builder = builder.bind::<i64>(*rv as i64); },
-                        common::types::Val::F32(rv)     => { builder = builder.bind::<f32>(*rv); },
-                        common::types::Val::F64(rv)     => { builder = builder.bind::<f64>(*rv); },
-                        common::types::Val::Str(rv)     => { builder = builder.bind(rv); },
-                        common::types::Val::S(rv)       => { builder = builder.bind(rv); },
-                        common::types::Val::Bool(rv)    => { builder = builder.bind(rv); },
+                        common::types::Val::I8(rv) => { 
+                            builder = builder.bind::<i8>(*rv); 
+                            builder_total = builder_total.bind::<i8>(*rv); 
+                        },
+                        common::types::Val::U8(rv) => { 
+                            builder = builder.bind::<i8>(*rv as i8); 
+                            builder_total = builder_total.bind::<i8>(*rv as i8); 
+                        },
+                        common::types::Val::I16(rv) => { 
+                            builder = builder.bind::<i16>(*rv); 
+                            builder_total = builder_total.bind::<i16>(*rv); 
+                        },
+                        common::types::Val::U16(rv) => { 
+                            builder = builder.bind::<i16>(*rv as i16); 
+                            builder_total = builder_total.bind::<i16>(*rv as i16); 
+                        },
+                        common::types::Val::I32(rv) => { 
+                            builder = builder.bind::<i32>(*rv); 
+                            builder_total = builder_total.bind::<i32>(*rv); 
+                        },
+                        common::types::Val::U32(rv) => { 
+                            builder = builder.bind::<i32>(*rv as i32); 
+                            builder_total = builder_total.bind::<i32>(*rv as i32); 
+                        },
+                        common::types::Val::I64(rv) => { 
+                            builder = builder.bind::<i64>(*rv); 
+                            builder_total = builder_total.bind::<i64>(*rv); 
+                        },
+                        common::types::Val::U64(rv) => { 
+                            builder = builder.bind::<i64>(*rv as i64); 
+                            builder_total = builder_total.bind::<i64>(*rv as i64); 
+                        },
+                        common::types::Val::F32(rv) => { 
+                            builder = builder.bind::<f32>(*rv); 
+                            builder_total = builder_total.bind::<f32>(*rv); 
+                        },
+                        common::types::Val::F64(rv) => { 
+                            builder = builder.bind::<f64>(*rv); 
+                            builder_total = builder_total.bind::<f64>(*rv); 
+                        },
+                        common::types::Val::Str(rv) => { 
+                            builder = builder.bind(rv); 
+                            builder_total = builder_total.bind(rv); 
+                        },
+                        common::types::Val::S(rv) => { 
+                            builder = builder.bind(rv); 
+                            builder_total = builder_total.bind(rv); },
+                        common::types::Val::Bool(rv) => { 
+                            builder = builder.bind(rv); 
+                            builder_total = builder_total.bind(rv); 
+                        },
                         _ => { continue; }
                     };
                 }
@@ -69,15 +111,15 @@ pub fn impl_crud_table(input: proc_macro::TokenStream) -> proc_macro::TokenStrea
                         return Err("获取数据失败: get_all_by_cond - select");
                     }
                 };
-                let sql_total = format!("SELECT COUNT(*) AS total FROM {} {}", Self::get_table_name(), sql_cond);
-                let cot = match sqlx::query_as::<_, common::types::pg::Total>(&sql_total).fetch_one(pool).await {
+                
+                let rows_total = match builder_total.fetch_one(pool).await {
                     Ok(v) => v,
                     Err(err) => {
                         println!("get_all_and_count_order_by error: {:?}", err);
                         return Err("获取数据失败: get_all_and_count_order_by - count");
                     }
                 };
-                Ok((rows, cot.total))
+                Ok((rows, rows_total.total))
             }
 
             /// get_all_by_query: 获取按查询条件/分页的全部记录 - 可以把 Order by 写到 query 查询条件里面
