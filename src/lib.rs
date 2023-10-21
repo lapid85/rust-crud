@@ -43,7 +43,26 @@ pub fn impl_crud_table(input: proc_macro::TokenStream) -> proc_macro::TokenStrea
             pub async fn get_all_by_cond(pool: &common::types::Db, cond: &common::types::Cond) -> Result<(Vec<Self>, i64), &'static str> {
                 let sql_cond = cond.build();
                 let sql = format!("SELECT {} FROM {} {}", Self::get_fields(), Self::get_table_name(), sql_cond);
-                let rows = match sqlx::query_as::<_, Self>(&sql).fetch_all(pool).await {
+                let mut builder = sqlx::query_as::<_, Self>(&sql);
+                for v in &cond.args {
+                    match v {
+                        common::types::Val::I8(rv)      => { builder = builder.bind::<i8>(*rv); },
+                        common::types::Val::U8(rv)      => { builder = builder.bind::<i8>(*rv as i8); },
+                        common::types::Val::I16(rv)     => { builder = builder.bind::<i16>(*rv); },
+                        common::types::Val::U16(rv)     => { builder = builder.bind::<i16>(*rv as i16); },
+                        common::types::Val::I32(rv)     => { builder = builder.bind::<i32>(*rv); },
+                        common::types::Val::U32(rv)     => { builder = builder.bind::<i32>(*rv as i32); },
+                        common::types::Val::I64(rv)     => { builder = builder.bind::<i64>(*rv); },
+                        common::types::Val::U64(rv)     => { builder = builder.bind::<i64>(*rv as i64); },
+                        common::types::Val::F32(rv)     => { builder = builder.bind::<f32>(*rv); },
+                        common::types::Val::F64(rv)     => { builder = builder.bind::<f64>(*rv); },
+                        common::types::Val::Str(rv)     => { builder = builder.bind(rv); },
+                        common::types::Val::S(rv)       => { builder = builder.bind(rv); },
+                        common::types::Val::Bool(rv)    => { builder = builder.bind(rv); },
+                        _ => { continue; }
+                    };
+                }
+                let rows = match builder.fetch_all(pool).await {
                     Ok(v) => v,
                     Err(err) => {
                         println!("get_all_by_cond error: {:?}", err);
@@ -342,8 +361,7 @@ pub fn impl_crud_table(input: proc_macro::TokenStream) -> proc_macro::TokenStrea
                                 builder = builder.bind(common::utils::dt::now_utc_micro());
                             }}"#
                             );
-                            let created_builder_stmt =
-                                syn::parse_str(&created_builder_field).unwrap();
+                            let created_builder_stmt = syn::parse_str(&created_builder_field).unwrap();
                             create_builder_fields.push(created_builder_stmt);
                             // 修改记录 - updated 字段
                             let updated_field = format!(
@@ -360,8 +378,7 @@ pub fn impl_crud_table(input: proc_macro::TokenStream) -> proc_macro::TokenStrea
                                 builder = builder.bind(common::utils::dt::now_utc_micro());
                             }}"#
                             );
-                            let updated_builder_stmt =
-                                syn::parse_str(&updated_builder_field).unwrap();
+                            let updated_builder_stmt = syn::parse_str(&updated_builder_field).unwrap();
                             updated_builder_fields.push(updated_builder_stmt);
 
                             continue;
@@ -379,8 +396,7 @@ pub fn impl_crud_table(input: proc_macro::TokenStream) -> proc_macro::TokenStrea
                             "#,
                                 field_name, field_name
                             );
-                            let create_field_stmt =
-                                syn::parse_str(&create_field).expect("解析判断默认字段的值失败");
+                            let create_field_stmt = syn::parse_str(&create_field).expect("解析判断默认字段的值失败");
                             create_set_fields.push(create_field_stmt);
                             // 创建记录 - builder
                             let create_builder = format!(
