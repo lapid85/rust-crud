@@ -120,6 +120,7 @@ pub fn impl_crud_table(input: proc_macro::TokenStream) -> proc_macro::TokenStrea
                         return Err("获取数据失败: get_all_and_count_order_by - count");
                     }
                 };
+                // pool.close().await;
                 Ok((rows, rows_total.total))
             }
 
