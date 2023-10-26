@@ -42,10 +42,11 @@ pub fn impl_crud_table(input: proc_macro::TokenStream) -> proc_macro::TokenStrea
             /// get_all_by_cond: 获取带分页的全部记录
             pub async fn get_all_by_cond(pool: &common::types::Db, cond: &common::types::Cond) -> Result<(Vec<Self>, i64), &'static str> {
                 let sql_cond = cond.build();
-                let where_str = if cond.has_args() { format!("WHERE {}", sql_cond) } else { "".to_string() };
+                let where_str = if cond.has_args() { format!("WHERE {}", &sql_cond) } else { sql_cond.to_owned() };
                 let sql = format!("SELECT {} FROM {} {}", Self::get_fields(), Self::get_table_name(), where_str);
                 println!("SQL: {}", sql);
-                let sql_total = format!("SELECT COUNT(*) AS total FROM {} {}", Self::get_table_name(), where_str);
+                let where_str_total = if cond.has_args() { format!("WHERE {}", &sql_cond) } else { "".to_string() };
+                let sql_total = format!("SELECT COUNT(*) AS total FROM {} {}", Self::get_table_name(), where_str_total);
                 println!("SQL_TOTAL: {}", sql_total);
                 let mut builder = sqlx::query_as::<_, Self>(&sql);
                 let mut builder_total = sqlx::query_as::<_, common::types::pg::Total>(&sql_total);
