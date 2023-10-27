@@ -52,58 +52,20 @@ pub fn impl_crud_table(input: proc_macro::TokenStream) -> proc_macro::TokenStrea
                 let mut builder_total = sqlx::query_as::<_, common::types::pg::Total>(&sql_total);
                 for v in &cond.args {
                     match v {
-                        common::types::Val::I8(rv) => { 
-                            builder = builder.bind::<i8>(*rv); 
-                            builder_total = builder_total.bind::<i8>(*rv); 
-                        },
-                        common::types::Val::U8(rv) => { 
-                            builder = builder.bind::<i8>(*rv as i8); 
-                            builder_total = builder_total.bind::<i8>(*rv as i8); 
-                        },
-                        common::types::Val::I16(rv) => { 
-                            builder = builder.bind::<i16>(*rv); 
-                            builder_total = builder_total.bind::<i16>(*rv); 
-                        },
-                        common::types::Val::U16(rv) => { 
-                            builder = builder.bind::<i16>(*rv as i16); 
-                            builder_total = builder_total.bind::<i16>(*rv as i16); 
-                        },
-                        common::types::Val::I32(rv) => { 
-                            builder = builder.bind::<i32>(*rv); 
-                            builder_total = builder_total.bind::<i32>(*rv); 
-                        },
-                        common::types::Val::U32(rv) => { 
-                            builder = builder.bind::<i32>(*rv as i32); 
-                            builder_total = builder_total.bind::<i32>(*rv as i32); 
-                        },
-                        common::types::Val::I64(rv) => { 
-                            builder = builder.bind::<i64>(*rv); 
-                            builder_total = builder_total.bind::<i64>(*rv); 
-                        },
-                        common::types::Val::U64(rv) => { 
-                            builder = builder.bind::<i64>(*rv as i64); 
-                            builder_total = builder_total.bind::<i64>(*rv as i64); 
-                        },
-                        common::types::Val::F32(rv) => { 
-                            builder = builder.bind::<f32>(*rv); 
-                            builder_total = builder_total.bind::<f32>(*rv); 
-                        },
-                        common::types::Val::F64(rv) => { 
-                            builder = builder.bind::<f64>(*rv); 
-                            builder_total = builder_total.bind::<f64>(*rv); 
-                        },
-                        common::types::Val::Str(rv) => { 
-                            builder = builder.bind(rv); 
-                            builder_total = builder_total.bind(rv); 
-                        },
-                        common::types::Val::S(rv) => { 
-                            builder = builder.bind(rv); 
-                            builder_total = builder_total.bind(rv); },
-                        common::types::Val::Bool(rv) => { 
-                            builder = builder.bind(rv); 
-                            builder_total = builder_total.bind(rv); 
-                        },
-                        _ => { continue; }
+                        common::types::Val::I8(rv) =>   { builder = builder.bind::<i8>(*rv);            builder_total = builder_total.bind::<i8>(*rv); },
+                        common::types::Val::U8(rv) =>   { builder = builder.bind::<i8>(*rv as i8);      builder_total = builder_total.bind::<i8>(*rv as i8); },
+                        common::types::Val::I16(rv) =>  { builder = builder.bind::<i16>(*rv);           builder_total = builder_total.bind::<i16>(*rv); },
+                        common::types::Val::U16(rv) =>  { builder = builder.bind::<i16>(*rv as i16);    builder_total = builder_total.bind::<i16>(*rv as i16); },
+                        common::types::Val::I32(rv) =>  { builder = builder.bind::<i32>(*rv);           builder_total = builder_total.bind::<i32>(*rv); },
+                        common::types::Val::U32(rv) =>  { builder = builder.bind::<i32>(*rv as i32);    builder_total = builder_total.bind::<i32>(*rv as i32); },
+                        common::types::Val::I64(rv) =>  { builder = builder.bind::<i64>(*rv);           builder_total = builder_total.bind::<i64>(*rv); },
+                        common::types::Val::U64(rv) =>  { builder = builder.bind::<i64>(*rv as i64);    builder_total = builder_total.bind::<i64>(*rv as i64); },
+                        common::types::Val::F32(rv) =>  { builder = builder.bind::<f32>(*rv);           builder_total = builder_total.bind::<f32>(*rv); },
+                        common::types::Val::F64(rv) =>  { builder = builder.bind::<f64>(*rv);           builder_total = builder_total.bind::<f64>(*rv); },
+                        common::types::Val::Str(rv) =>  { builder = builder.bind(rv);                   builder_total = builder_total.bind(rv); },
+                        common::types::Val::S(rv) =>    { builder = builder.bind(rv);                   builder_total = builder_total.bind(rv); }, 
+                        common::types::Val::Bool(rv) => { builder = builder.bind(rv);                   builder_total = builder_total.bind(rv); }, 
+                            _ => { continue; }
                     };
                 }
                 let rows = match builder.fetch_all(pool).await {
@@ -169,7 +131,8 @@ pub fn impl_crud_table(input: proc_macro::TokenStream) -> proc_macro::TokenStrea
             /// get_by_cond: 查询单条记录 - 依据条件
             pub async fn get_by_cond(pool: &common::types::Db, cond: &common::types::Cond) -> Option<Self> {
                 let sql_cond = cond.build();
-                let sql = format!("SELECT {} FROM {} {}", Self::get_fields(), Self::get_table_name(), sql_cond);
+                let where_str = if cond.has_args() { format!("WHERE {}", &sql_cond) } else { sql_cond };
+                let sql = format!("SELECT {} FROM {} {}", Self::get_fields(), Self::get_table_name(), where_str);
                 if let Ok(v) = sqlx::query_as::<_, Self>(&sql).fetch_one(pool).await {
                     return Some(v);
                 }
