@@ -44,10 +44,8 @@ pub fn impl_crud_table(input: proc_macro::TokenStream) -> proc_macro::TokenStrea
                 let sql_cond = cond.build();
                 let where_str = if cond.has_args() { format!("WHERE {}", &sql_cond) } else { sql_cond.to_owned() };
                 let sql = format!("SELECT {} FROM {} {}", Self::get_fields(), Self::get_table_name(), where_str);
-                println!("SQL: {}", sql);
                 let where_str_total = if cond.has_args() { format!("WHERE {}", &sql_cond) } else { "".to_string() };
                 let sql_total = format!("SELECT COUNT(*) AS total FROM {} {}", Self::get_table_name(), where_str_total);
-                println!("SQL_TOTAL: {}", sql_total);
                 let mut builder = sqlx::query_as::<_, Self>(&sql);
                 let mut builder_total = sqlx::query_as::<_, common::types::pg::Total>(&sql_total);
                 for v in &cond.args {
@@ -290,7 +288,6 @@ pub fn impl_crud_table(input: proc_macro::TokenStream) -> proc_macro::TokenStrea
                             /// 依据字段 #current_field 更新单条记录
                             pub async fn #modify_by_method(&self, pool: &common::types::Db, field_value: &#field_type) -> Result<(), &'static str> {
                                 let change_sql = format!("UPDATE {} {} WHERE id = {}", Self::get_table_name(), #modify_where_sql, &self.id);
-                                println!("CHANGE SQL: {}", change_sql);
                                 match sqlx::query(&change_sql).bind(field_value).execute(pool).await {
                                         Ok(_) => Ok(()),
                                         Err(err) => {
@@ -503,7 +500,6 @@ pub fn impl_crud_table(input: proc_macro::TokenStream) -> proc_macro::TokenStrea
                 insert_sql.push_str(") VALUES (");
                 insert_sql.push_str(&values.join(","));
                 insert_sql.push_str(")");
-                println!("INSERTING SQL: {}", &insert_sql);
                 let mut builder = sqlx::query(&insert_sql);
                 #(#create_builder_fields)*
                 match builder.execute(pool).await {
@@ -530,7 +526,6 @@ pub fn impl_crud_table(input: proc_macro::TokenStream) -> proc_macro::TokenStrea
                 insert_sql.push_str(") ON CONFLICT (");
                 insert_sql.push_str(skip_field);
                 insert_sql.push_str(") DO NOTHING");
-                println!("INSERTING OR SKIP SQL: {}", &insert_sql);
                 let mut builder = sqlx::query(&insert_sql);
                 #(#create_builder_fields)*
                 match builder.execute(pool).await {
@@ -557,7 +552,6 @@ pub fn impl_crud_table(input: proc_macro::TokenStream) -> proc_macro::TokenStrea
                 #(#updated_set_fields)*
                 update_sql.push_str(&values.join(","));
                 update_sql.push_str(&format!(" WHERE id = {}", self.id));
-                println!("UPDATING SQL: {}", &update_sql);
                 let mut builder = sqlx::query(&update_sql);
                 for (_, val) in cond_fields {
                     match val {
@@ -599,7 +593,6 @@ pub fn impl_crud_table(input: proc_macro::TokenStream) -> proc_macro::TokenStrea
                 #(#updated_set_fields)*
                 save_sql.push_str(&values.join(","));
                 save_sql.push_str(&format!(" WHERE id = {}", self.id));
-                println!("SAVING SQL: {}", &save_sql);
                 let mut builder = sqlx::query(&save_sql);
                 #(#update_builder_fields)*
                 #(#updated_builder_fields)*
@@ -618,7 +611,6 @@ pub fn impl_crud_table(input: proc_macro::TokenStream) -> proc_macro::TokenStrea
                 let mut delete_sql = String::from("DELETE FROM ");
                 delete_sql.push_str(Self::get_table_name());
                 delete_sql.push_str(&format!(" WHERE id = {}", self.id));
-                println!("DELETING SQL: {}", &delete_sql);
                 match sqlx::query(&delete_sql).execute(pool).await {
                     Ok(_) => Ok(()),
                     Err(e) => {
