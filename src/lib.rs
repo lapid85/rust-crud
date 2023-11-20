@@ -43,9 +43,14 @@ pub fn impl_crud_table(input: proc_macro::TokenStream) -> proc_macro::TokenStrea
             pub async fn get_all_by_cond(pool: &common::types::Db, cond: &common::types::Cond) -> Result<(Vec<Self>, i64), &'static str> {
                 let sql_cond = cond.build();
                 let where_str = if cond.has_args() { format!("WHERE {}", &sql_cond) } else { sql_cond.to_owned() };
-                let sql = format!("SELECT {} FROM {} {}", Self::get_fields(), Self::get_table_name(), where_str);
+                let (page, page_size) = cond.get_limits();
+                let offset = (page - 1) * page_size;
+                let order_sort = if let Some(v) = cond.get_order_by() { format!("ORDER BY {}", v) } else { "".to_string() };
+                let sql = format!("SELECT {} FROM {} {} {} LIMIT {} OFFSET {}", Self::get_fields(), Self::get_table_name(), where_str, order_sort, page_size, offset);
+                log::info!("SQL: {}", &sql);
                 let where_str_total = if cond.has_args() { format!("WHERE {}", &sql_cond) } else { "".to_string() };
                 let sql_total = format!("SELECT COUNT(*) AS total FROM {} {}", Self::get_table_name(), where_str_total);
+                log::info!("SQL TOTAL: {}", &sql_total);
                 let mut builder = sqlx::query_as::<_, Self>(&sql);
                 let mut builder_total = sqlx::query_as::<_, common::types::pg::Total>(&sql_total);
                 for v in &cond.args {
@@ -69,7 +74,7 @@ pub fn impl_crud_table(input: proc_macro::TokenStream) -> proc_macro::TokenStrea
                 let rows = match builder.fetch_all(pool).await {
                     Ok(v) => v,
                     Err(err) => {
-                        println!("get_all_by_cond error: {:?}", err);
+                        log::error!("依据条侦探获取数据失败: {:?},\nSQL: {}", err, sql);
                         return Err("获取数据失败: get_all_by_cond - select");
                     }
                 };
@@ -77,12 +82,46 @@ pub fn impl_crud_table(input: proc_macro::TokenStream) -> proc_macro::TokenStrea
                 let rows_total = match builder_total.fetch_one(pool).await {
                     Ok(v) => v,
                     Err(err) => {
-                        println!("get_all_and_count_order_by error: {:?}", err);
-                        return Err("获取数据失败: get_all_and_count_order_by - count");
+                        log::error!("依据条件获取统计失败: {:?},\nSQL: {}", err, sql_total);
+                        return Err("获取数据失败: get_all_by_cond - count");
                     }
                 };
                 // pool.close().await;
                 Ok((rows, rows_total.total))
+            }
+
+            /// count_by_cond 依据条件获取统计
+            pub async fn count_by_cond(pool: &common::types::Db, cond: &common::types::Cond) -> Result<i64, &'static str> {
+                let sql_cond = cond.build();
+                let where_str = if cond.has_args() { format!("WHERE {}", &sql_cond) } else { sql_cond.to_owned() };
+                let sql = format!("SELECT COUNT(*) AS total FROM {} {}", Self::get_table_name(), where_str);
+                let mut builder = sqlx::query_as::<_, common::types::pg::Total>(&sql);
+                for v in &cond.args {
+                    match v {
+                        common::types::Val::I8(rv) =>   { builder = builder.bind::<i8>(*rv); },
+                        common::types::Val::U8(rv) =>   { builder = builder.bind::<i8>(*rv as i8); },
+                        common::types::Val::I16(rv) =>  { builder = builder.bind::<i16>(*rv); },
+                        common::types::Val::U16(rv) =>  { builder = builder.bind::<i16>(*rv as i16); },
+                        common::types::Val::I32(rv) =>  { builder = builder.bind::<i32>(*rv); },
+                        common::types::Val::U32(rv) =>  { builder = builder.bind::<i32>(*rv as i32); },
+                        common::types::Val::I64(rv) =>  { builder = builder.bind::<i64>(*rv); },
+                        common::types::Val::U64(rv) =>  { builder = builder.bind::<i64>(*rv as i64); },
+                        common::types::Val::F32(rv) =>  { builder = builder.bind::<f32>(*rv); },
+                        common::types::Val::F64(rv) =>  { builder = builder.bind::<f64>(*rv); },
+                        common::types::Val::Str(rv) =>  { builder = builder.bind(rv); },
+                        common::types::Val::S(rv) =>    { builder = builder.bind(rv); }, 
+                        common::types::Val::Bool(rv) => { builder = builder.bind(rv); }, 
+                            _ => { continue; }
+                    };
+                }
+                let rows = match builder.fetch_one(pool).await {
+                    Ok(v) => v,
+                    Err(err) => {
+                        log::error!("依据条件获取统计失败: {:?},\nSQL: {}", err, sql);
+                        return Err("获取数据失败: count_by_cond");
+                    }
+                };
+                Ok(rows.total)
             }
 
             /// get_all_by_query: 获取按查询条件/分页的全部记录 - 可以把 Order by 写到 query 查询条件里面
@@ -111,7 +150,7 @@ pub fn impl_crud_table(input: proc_macro::TokenStream) -> proc_macro::TokenStrea
                 let rows = match builder.fetch_all(pool).await {
                     Ok(v) => v,
                     Err(err) => {
-                        println!("SQL: {}\n{}", sql, err);
+                        log::error!("SQL: {}\n{}", sql, err);
                         return Err("获取数据失败: 无法依据条件获取数据");
                     }
                 };
@@ -121,7 +160,7 @@ pub fn impl_crud_table(input: proc_macro::TokenStream) -> proc_macro::TokenStrea
             /// get_all_by_query_raw: 获取全部记录
             pub async fn get_all_by_query_raw(pool: &common::types::Db, sql: &str) -> Result<Vec<Self>, &'static str> {
                 sqlx::query_as::<_, Self>(sql).fetch_all(pool).await.map_err(|e| {
-                        println!("get_all error: {:?}", e);
+                        log::error!("get_all error: {:?}", e);
                         "获取数据失败"
                 })
             }
@@ -555,8 +594,53 @@ pub fn impl_crud_table(input: proc_macro::TokenStream) -> proc_macro::TokenStrea
                 match builder.execute(pool).await {
                     Ok(_) => Ok(()),
                     Err(e) => {
-                        println!("Update error: {}", e);
-                        Err("记录修改失败")
+                        println!("依据ID修改单个记录出错: {}", e);
+                        Err("记录修改失败: 依据ID")
+                    }
+                }
+            }
+            
+            /// 更新记录 - 依据多个条件修改字段
+            pub async fn update_by_cond(pool: &common::types::Db, cond_fields: &[(&'static str, common::types::Val)], cond: &common::types::Cond) -> Result<(), &'static str> {
+                let mut update_sql = String::from("UPDATE ");
+                update_sql.push_str(Self::get_table_name());
+                update_sql.push_str(" SET ");
+                let mut index = 1;
+                let mut values: Vec<String> = vec![];
+                for (field, _) in cond_fields {
+                    values.push(format!("{} = ${}", field, index));
+                    index += 1;
+                }
+                #(#updated_set_fields)*
+                update_sql.push_str(&values.join(","));
+                let sql_cond = cond.build();
+                let where_str = if cond.has_args() { format!("WHERE {}", &sql_cond) } else { sql_cond };
+                update_sql.push_str(&where_str);
+                let mut builder = sqlx::query(&update_sql);
+                for (_, val) in cond_fields {
+                    match val {
+                        common::types::Val::I8(rv)  =>  { builder = builder.bind::<i8>(*rv);        },
+                        common::types::Val::U8(rv)  =>  { builder = builder.bind::<i8>(*rv as i8);  },
+                        common::types::Val::I16(rv) =>  { builder = builder.bind::<i16>(*rv);       },
+                        common::types::Val::U16(rv) =>  { builder = builder.bind::<i16>(*rv as i16);},
+                        common::types::Val::I32(rv) =>  { builder = builder.bind::<i32>(*rv);       },
+                        common::types::Val::U32(rv) =>  { builder = builder.bind::<i32>(*rv as i32);},
+                        common::types::Val::I64(rv) =>  { builder = builder.bind::<i64>(*rv);       },
+                        common::types::Val::U64(rv) =>  { builder = builder.bind::<i64>(*rv as i64);},
+                        common::types::Val::F32(rv) =>  { builder = builder.bind::<f32>(*rv);       },
+                        common::types::Val::F64(rv) =>  { builder = builder.bind::<f64>(*rv);       },
+                        common::types::Val::Str(rv) =>  { builder = builder.bind(rv);               },
+                        common::types::Val::S(rv)   =>  { builder = builder.bind(rv);               },
+                        common::types::Val::Bool(rv) => { builder = builder.bind(rv);               },
+                        _ => { continue; }
+                    }
+                }
+                #(#updated_builder_fields)*
+                match builder.execute(pool).await {
+                    Ok(_) => Ok(()),
+                    Err(e) => {
+                        println!("依据条件修改记录出错: {}", e);
+                        Err("记录修改失败: 依据条件")
                     }
                 }
             }
@@ -594,8 +678,43 @@ pub fn impl_crud_table(input: proc_macro::TokenStream) -> proc_macro::TokenStrea
                 match sqlx::query(&delete_sql).execute(pool).await {
                     Ok(_) => Ok(()),
                     Err(e) => {
-                        println!("Delete error: {}", e);
-                        Err("记录删除失败")
+                        println!("依据ID删除记录失败: {}", e);
+                        Err("依据ID记录删除失败")
+                    }
+                }
+            }
+
+            /// 依据条件删除记录
+            pub async fn delete_by_cond(pool: &common::types::Db, cond: &common::types::Cond) -> Result<(), &'static str> {
+                let sql_cond = cond.build();
+                let where_str = if cond.has_args() { format!(" WHERE {}", &sql_cond) } else { sql_cond };
+                let mut delete_sql = String::from("DELETE FROM ");
+                delete_sql.push_str(Self::get_table_name());
+                delete_sql.push_str(&where_str);
+                let mut builder = sqlx::query(&delete_sql);
+                for v in &cond.args {
+                    match v {
+                        common::types::Val::I8(rv) =>   { builder = builder.bind::<i8>(*rv);        },
+                        common::types::Val::U8(rv) =>   { builder = builder.bind::<i8>(*rv as i8);  },
+                        common::types::Val::I16(rv) =>  { builder = builder.bind::<i16>(*rv);       },
+                        common::types::Val::U16(rv) =>  { builder = builder.bind::<i16>(*rv as i16);},
+                        common::types::Val::I32(rv) =>  { builder = builder.bind::<i32>(*rv);       },
+                        common::types::Val::U32(rv) =>  { builder = builder.bind::<i32>(*rv as i32);},
+                        common::types::Val::I64(rv) =>  { builder = builder.bind::<i64>(*rv);       },
+                        common::types::Val::U64(rv) =>  { builder = builder.bind::<i64>(*rv as i64);},
+                        common::types::Val::F32(rv) =>  { builder = builder.bind::<f32>(*rv);       },
+                        common::types::Val::F64(rv) =>  { builder = builder.bind::<f64>(*rv);       },
+                        common::types::Val::Str(rv) =>  { builder = builder.bind(rv);               },
+                        common::types::Val::S(rv) =>    { builder = builder.bind(rv);               }, 
+                        common::types::Val::Bool(rv) => { builder = builder.bind(rv);               }, 
+                            _ => { continue; }
+                    };
+                }
+                match builder.execute(pool).await {
+                    Ok(_) => Ok(()),
+                    Err(e) => {
+                        println!("依据条件删除记录失败: {}", e);
+                        Err("依据条件删除记录失败")
                     }
                 }
             }
