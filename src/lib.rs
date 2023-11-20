@@ -243,7 +243,7 @@ pub fn impl_crud_table(input: proc_macro::TokenStream) -> proc_macro::TokenStrea
                             &format!("delete_by_{}", field_name),
                             proc_macro2::Span::call_site(),
                         );
-                        let delete_where_sql = format!("WHERE {} = $1 LIMIT 1", &field_name);
+                        let delete_where_sql = format!("WHERE {} = $1", &field_name);
                         tokens.push(quote!{
                             /// 依据字段 #current_field 删除单条记录
                             pub async fn #delete_by_method(pool: &common::types::Db, field_value: &#field_type) -> Result<(), &'static str> {
@@ -253,26 +253,6 @@ pub fn impl_crud_table(input: proc_macro::TokenStream) -> proc_macro::TokenStrea
                                         Err(err) => {
                                             println!("{}", err);
                                             Err("依据条件删除数据失败")
-                                        }
-                                }
-                            }
-                        });
-
-                        // delete_all_by
-                        let delete_all_by_method = Ident::new(
-                            &format!("delete_all_by_{}", field_name),
-                            proc_macro2::Span::call_site(),
-                        );
-                        let delete_all_where_sql = format!("WHERE {} = $1", &field_name);
-                        tokens.push(quote!{
-                            /// 依据字段 #current_field 删除全部记录
-                            pub async fn #delete_all_by_method(pool: &common::types::Db, field_value: &#field_type) -> Result<(), &'static str> {
-                                let sql = format!("DELETE FROM {} {}", Self::get_table_name(), #delete_all_where_sql);
-                                match sqlx::query(&sql).bind(field_value).execute(pool).await {
-                                        Ok(_) => Ok(()),
-                                        Err(err) => {
-                                            println!("{}", err);
-                                            Err("依据条件删除全部数据失败")
                                         }
                                 }
                             }
