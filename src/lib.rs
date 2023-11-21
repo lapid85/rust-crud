@@ -331,6 +331,8 @@ pub fn impl_crud_table(input: proc_macro::TokenStream) -> proc_macro::TokenStrea
         let mut update_builder_fields: Vec<syn::Stmt> = vec![]; // 更新记录时的 builder 处理
         let mut updated_set_fields: Vec<syn::Stmt> = vec![];
         let mut updated_builder_fields: Vec<syn::Stmt> = vec![];
+        let mut has_id = false;
+        let mut has_name = false;
 
         match data {
             Data::Struct(s) => match s.fields {
@@ -341,7 +343,11 @@ pub fn impl_crud_table(input: proc_macro::TokenStream) -> proc_macro::TokenStrea
 
                         table_fields.push(field_name.to_owned());
                         if field_name == "id" {
+                            has_id = true;
                             continue;
+                        }
+                        if field_name == "name" {
+                            has_name = true;
                         }
                         // 创建记录 - created 字段
                         if field_name == "created" {
@@ -508,6 +514,55 @@ pub fn impl_crud_table(input: proc_macro::TokenStream) -> proc_macro::TokenStrea
                 #all_fields
             }
         });
+        if has_id && has_name {
+            tokens.push(quote! {
+                /// get_all_id_names: 获取全部记录的 id 和 name
+                pub async fn get_all_id_names(pool: &common::types::Db) -> Result<Vec<common::types::IdName>, &'static str> {
+                    let sql = format!("SELECT id,name FROM {}", Self::get_table_name());
+                    match sqlx::query_as::<_, common::types::IdName>(&sql).fetch_all(pool).await {
+                        Ok(v) => Ok(v),
+                        Err(err) => {
+                            println!("get_all_id_names error: {:?}", err);
+                            Err("获取数据失败")
+                        }
+                    }
+                }
+
+                /// get_all_id_names_by_cond: 获取带分页的全部记录的 id 和 name
+                pub async fn get_all_id_names_by_cond(pool: &common::types::Db, cond: &common::types::Cond) -> Result<Vec<common::types::IdName>, &'static str> {
+                    let sql_cond = cond.build();
+                    let where_str = if cond.has_args() { format!("WHERE {}", &sql_cond) } else { sql_cond.to_owned() };
+                    let order_sort = if let Some(v) = cond.get_order_by() { format!("ORDER BY {}", v) } else { "".to_string() };
+                    let sql = format!("SELECT id,name FROM {} {} {}", Self::get_table_name(), where_str, order_sort);
+                    let mut builder = sqlx::query_as::<_, common::types::IdName>(&sql);
+                    for val in &cond.args {
+                        match val {
+                            common::types::Val::I8(rv) =>   { builder = builder.bind::<i8>(*rv);        },
+                            common::types::Val::U8(rv) =>   { builder = builder.bind::<i8>(*rv as i8);  },
+                            common::types::Val::I16(rv) =>  { builder = builder.bind::<i16>(*rv);       },
+                            common::types::Val::U16(rv) =>  { builder = builder.bind::<i16>(*rv as i16);},
+                            common::types::Val::I32(rv) =>  { builder = builder.bind::<i32>(*rv);       },
+                            common::types::Val::U32(rv) =>  { builder = builder.bind::<i32>(*rv as i32);},
+                            common::types::Val::I64(rv) =>  { builder = builder.bind::<i64>(*rv);       },
+                            common::types::Val::U64(rv) =>  { builder = builder.bind::<i64>(*rv as i64);},
+                            common::types::Val::F32(rv) =>  { builder = builder.bind::<f32>(*rv);       },
+                            common::types::Val::F64(rv) =>  { builder = builder.bind::<f64>(*rv);       },
+                            common::types::Val::Str(rv) =>  { builder = builder.bind(rv);               },
+                            common::types::Val::S(rv) =>    { builder = builder.bind(rv);               },
+                            common::types::Val::Bool(rv) => { builder = builder.bind(rv);               },
+                            _ => { continue; }
+                        };
+                    }
+                    match builder.fetch_all(pool).await {
+                        Ok(v) => Ok(v),
+                        Err(err) => {
+                            log::error!("依据条侦探获取数据失败: {:?},\nSQL: {}", err, sql);
+                            Err("获取数据失败: get_all_by_cond - select")
+                        }
+                    }
+                }
+            });
+        }
         tokens.push(quote! {
             pub async fn create(&self, pool: &common::types::Db) -> Result<(), &'static str> {
                 let mut insert_sql = String::from("INSERT INTO ");
