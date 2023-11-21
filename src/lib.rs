@@ -605,7 +605,7 @@ pub fn impl_crud_table(input: proc_macro::TokenStream) -> proc_macro::TokenStrea
                 let mut update_sql = String::from("UPDATE ");
                 update_sql.push_str(Self::get_table_name());
                 update_sql.push_str(" SET ");
-                let mut index = 1;
+                let mut index = cond.arg_count + 1;
                 let mut values: Vec<String> = vec![];
                 for (field, _) in cond_fields {
                     values.push(format!("{} = ${}", field, index));
@@ -617,6 +617,24 @@ pub fn impl_crud_table(input: proc_macro::TokenStream) -> proc_macro::TokenStrea
                 let where_str = if cond.has_args() { format!("WHERE {}", &sql_cond) } else { sql_cond };
                 update_sql.push_str(&where_str);
                 let mut builder = sqlx::query(&update_sql);
+                for val in &cond.args {
+                    match val {
+                        common::types::Val::I8(rv) =>   { builder = builder.bind::<i8>(*rv);        },
+                        common::types::Val::U8(rv) =>   { builder = builder.bind::<i8>(*rv as i8);  },
+                        common::types::Val::I16(rv) =>  { builder = builder.bind::<i16>(*rv);       },
+                        common::types::Val::U16(rv) =>  { builder = builder.bind::<i16>(*rv as i16);},
+                        common::types::Val::I32(rv) =>  { builder = builder.bind::<i32>(*rv);       },
+                        common::types::Val::U32(rv) =>  { builder = builder.bind::<i32>(*rv as i32);},
+                        common::types::Val::I64(rv) =>  { builder = builder.bind::<i64>(*rv);       },
+                        common::types::Val::U64(rv) =>  { builder = builder.bind::<i64>(*rv as i64);},
+                        common::types::Val::F32(rv) =>  { builder = builder.bind::<f32>(*rv);       },
+                        common::types::Val::F64(rv) =>  { builder = builder.bind::<f64>(*rv);       },
+                        common::types::Val::Str(rv) =>  { builder = builder.bind(rv);               },
+                        common::types::Val::S(rv) =>    { builder = builder.bind(rv);               }, 
+                        common::types::Val::Bool(rv) => { builder = builder.bind(rv);               }, 
+                        _ => { continue; }
+                    }
+                }
                 for (_, val) in cond_fields {
                     match val {
                         common::types::Val::I8(rv)  =>  { builder = builder.bind::<i8>(*rv);        },
