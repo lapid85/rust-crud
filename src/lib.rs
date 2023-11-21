@@ -385,7 +385,8 @@ pub fn impl_crud_table(input: proc_macro::TokenStream) -> proc_macro::TokenStrea
                                 builder = builder.bind(common::utils::dt::now_utc_micro());
                             }}"#
                             );
-                            let created_builder_stmt = syn::parse_str(&created_builder_field).unwrap();
+                            let created_builder_stmt =
+                                syn::parse_str(&created_builder_field).unwrap();
                             create_builder_fields.push(created_builder_stmt);
                             // 修改记录 - updated 字段
                             let updated_field = format!(
@@ -402,7 +403,8 @@ pub fn impl_crud_table(input: proc_macro::TokenStream) -> proc_macro::TokenStrea
                                 builder = builder.bind(common::utils::dt::now_utc_micro());
                             }}"#
                             );
-                            let updated_builder_stmt = syn::parse_str(&updated_builder_field).unwrap();
+                            let updated_builder_stmt =
+                                syn::parse_str(&updated_builder_field).unwrap();
                             updated_builder_fields.push(updated_builder_stmt);
 
                             continue;
@@ -420,7 +422,8 @@ pub fn impl_crud_table(input: proc_macro::TokenStream) -> proc_macro::TokenStrea
                             "#,
                                 field_name, field_name
                             );
-                            let create_field_stmt = syn::parse_str(&create_field).expect("解析判断默认字段的值失败");
+                            let create_field_stmt =
+                                syn::parse_str(&create_field).expect("解析判断默认字段的值失败");
                             create_set_fields.push(create_field_stmt);
                             // 创建记录 - builder
                             let create_builder = format!(
