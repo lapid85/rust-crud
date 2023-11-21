@@ -66,8 +66,8 @@ pub fn impl_crud_table(input: proc_macro::TokenStream) -> proc_macro::TokenStrea
                         common::types::Val::F32(rv) =>  { builder = builder.bind::<f32>(*rv);           builder_total = builder_total.bind::<f32>(*rv); },
                         common::types::Val::F64(rv) =>  { builder = builder.bind::<f64>(*rv);           builder_total = builder_total.bind::<f64>(*rv); },
                         common::types::Val::Str(rv) =>  { builder = builder.bind(rv);                   builder_total = builder_total.bind(rv); },
-                        common::types::Val::S(rv) =>    { builder = builder.bind(rv);                   builder_total = builder_total.bind(rv); }, 
-                        common::types::Val::Bool(rv) => { builder = builder.bind(rv);                   builder_total = builder_total.bind(rv); }, 
+                        common::types::Val::S(rv) =>    { builder = builder.bind(rv);                   builder_total = builder_total.bind(rv); },
+                        common::types::Val::Bool(rv) => { builder = builder.bind(rv);                   builder_total = builder_total.bind(rv); },
                             _ => { continue; }
                     };
                 }
@@ -78,7 +78,6 @@ pub fn impl_crud_table(input: proc_macro::TokenStream) -> proc_macro::TokenStrea
                         return Err("获取数据失败: get_all_by_cond - select");
                     }
                 };
-                
                 let rows_total = match builder_total.fetch_one(pool).await {
                     Ok(v) => v,
                     Err(err) => {
@@ -109,9 +108,9 @@ pub fn impl_crud_table(input: proc_macro::TokenStream) -> proc_macro::TokenStrea
                         common::types::Val::F32(rv) =>  { builder = builder.bind::<f32>(*rv); },
                         common::types::Val::F64(rv) =>  { builder = builder.bind::<f64>(*rv); },
                         common::types::Val::Str(rv) =>  { builder = builder.bind(rv); },
-                        common::types::Val::S(rv) =>    { builder = builder.bind(rv); }, 
-                        common::types::Val::Bool(rv) => { builder = builder.bind(rv); }, 
-                            _ => { continue; }
+                        common::types::Val::S(rv) =>    { builder = builder.bind(rv); },
+                        common::types::Val::Bool(rv) => { builder = builder.bind(rv); },
+                        _ => { continue; }
                     };
                 }
                 let rows = match builder.fetch_one(pool).await {
@@ -602,7 +601,6 @@ pub fn impl_crud_table(input: proc_macro::TokenStream) -> proc_macro::TokenStrea
                     }
                 }
             }
-            
             /// 更新记录 - 依据多个条件修改字段
             pub async fn update_by_cond(pool: &common::types::Db, cond_fields: &[(&'static str, common::types::Val)], cond: &common::types::Cond) -> Result<(), &'static str> {
                 let mut update_sql = String::from("UPDATE ");
@@ -633,8 +631,8 @@ pub fn impl_crud_table(input: proc_macro::TokenStream) -> proc_macro::TokenStrea
                         common::types::Val::F32(rv) =>  { builder = builder.bind::<f32>(*rv);       },
                         common::types::Val::F64(rv) =>  { builder = builder.bind::<f64>(*rv);       },
                         common::types::Val::Str(rv) =>  { builder = builder.bind(rv);               },
-                        common::types::Val::S(rv) =>    { builder = builder.bind(rv);               }, 
-                        common::types::Val::Bool(rv) => { builder = builder.bind(rv);               }, 
+                        common::types::Val::S(rv) =>    { builder = builder.bind(rv);               },
+                        common::types::Val::Bool(rv) => { builder = builder.bind(rv);               },
                         _ => { continue; }
                     }
                 }
@@ -726,9 +724,9 @@ pub fn impl_crud_table(input: proc_macro::TokenStream) -> proc_macro::TokenStrea
                         common::types::Val::F32(rv) =>  { builder = builder.bind::<f32>(*rv);       },
                         common::types::Val::F64(rv) =>  { builder = builder.bind::<f64>(*rv);       },
                         common::types::Val::Str(rv) =>  { builder = builder.bind(rv);               },
-                        common::types::Val::S(rv) =>    { builder = builder.bind(rv);               }, 
-                        common::types::Val::Bool(rv) => { builder = builder.bind(rv);               }, 
-                            _ => { continue; }
+                        common::types::Val::S(rv) =>    { builder = builder.bind(rv);               },
+                        common::types::Val::Bool(rv) => { builder = builder.bind(rv);               },
+                        _ => { continue; }
                     };
                 }
                 match builder.execute(pool).await {
